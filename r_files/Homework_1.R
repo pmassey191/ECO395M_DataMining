@@ -37,7 +37,7 @@ ten_week_hit <- billboard %>%
 
 ggplot(ten_week_hit, aes(fct_rev(fct_reorder(performer,count)),count))+
   geom_bar(stat = "identity")+
-  coord_flip()+
+  coord_flip()
   
 
 
