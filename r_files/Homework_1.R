@@ -87,7 +87,7 @@ k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45,
 trim1_rmse = foreach(k = k_grid, .combine='rbind') %do% {
   model = knnreg(price ~ mileage, k=k, data = trim1_train, use.all=FALSE)
   errs = rmse(model,trim1_test)
-  c(k=k, err = mean(errs))
+  c(k=k, errs = errs)
 } %>% as.data.frame
 
 trim1_split = initial_split(trim1, prop=0.8) 
