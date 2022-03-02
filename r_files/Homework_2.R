@@ -15,13 +15,14 @@ capmetro_UT = read.csv('data/capmetro_UT.csv')
 glimpse(capmetro_UT)
 head(capmetro_UT)
 
+
 capmetro_UT_avg_boarding = mutate(capmetro_UT,
                      day_of_week = factor(day_of_week,
                                           levels=c("Mon", "Tue", "Wed","Thu", "Fri", "Sat", "Sun")),
                      month = factor(month,
                                     levels=c("Sep", "Oct","Nov")),
                      date = ymd_hms(capmetro_UT$timestamp)
-                     )) %>% 
+                     ) %>% 
   group_by(month,day_of_week,hour(date)) %>% 
   summarise(
     avg_boarding = mean(boarding)
@@ -32,11 +33,12 @@ ggplot(data = capmetro_UT_avg_boarding, aes(x = hour, y = avg_boarding,color = m
   geom_line()+
   facet_wrap(~day_of_week)
 
+
 ggplot(data = capmetro_UT, aes(x = temperature, y = boarding, color = weekend))+
   geom_point()+
   facet_wrap(~hour(ymd_hms(timestamp)))
 
-#number 2
+#number 3
 
 german_credit = read.csv('data/german_credit.csv')
 
@@ -45,7 +47,7 @@ model <- glm(Default ~ duration + amount + installment + age + history + purpose
              data = german_credit, family = 'binomial')
 summary(model)
 
-#number 3
+#number 4
 
 hotels_dev = read.csv('data/hotels_dev.csv')
 hotels_val = read.csv('data/hotels_val.csv')
@@ -56,6 +58,7 @@ hotels_test <- testing(hotels_split)
 
 model_small <- lm(children ~ market_segment + adults + customer_type + is_repeated_guest, data = hotels_train)
 model_large <- lm(children ~ . - arrival_date, data = hotels_train)
+
 
 
 
