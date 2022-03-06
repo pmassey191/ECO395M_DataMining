@@ -147,52 +147,84 @@ roc_curve_hotel = foreach(thresh = thresh_grid, .combine='rbind') %do% {
   yhat_test_model_small = ifelse(phat_test_model_small >= thresh, 1, 0)
   yhat_test_model_large = ifelse(phat_test_model_large >= thresh, 1, 0)
   yhat_test_model_good = ifelse(phat_test_model_good >= thresh, 1, 0)
-  confusion_out_model_small = table(y = hotels_test$children, yhat = yhat_test_model_small)
-  confusion_out_model_large = table(y = hotels_test$children, yhat = yhat_test_model_large)
-  confusion_out_model_good = table(y = hotels_test$children, yhat = yhat_test_model_good)
-  out_model_small = data.frame(model = "model_small",
-                       TPR = ifelse(sum(yhat_test_model_small) ==0, 0, confusion_out_model_small[2,2]/sum(hotels_test$children==1)),
-                       FPR = ifelse(sum(yhat_test_model_small) == 0, 0,confusion_out_model_small[1,2]/sum(hotels_test$children==0)))
-  out_model_large = data.frame(model = "model_large",
-                      TPR = ifelse(sum(yhat_test_model_large) ==0, 0, confusion_out_model_large[2,2]/sum(hotels_test$children==1)),
-                      FPR = ifelse(sum(yhat_test_model_large) == 0, 0,confusion_out_model_large[1,2]/sum(hotels_test$children==0)))
-  out_model_good = data.frame(model = "model_good",
-                      TPR = if(sum(yhat_test_model_good)==nrow(hotels_test)){
-                        confusion_out_model_good[2,1]/sum(hotels_test$children==1)
-                      }else if(sum(yhat_test_model_good) == 0){
-                        0
-                      }else{
-                        confusion_out_model_good[2,2]/sum(hotels_test$children==1)
-                      },
-                      FPR = if(sum(yhat_test_model_good)==nrow(hotels_test)){
-                        0
-                      }else if(sum(yhat_test_model_good) == 0){
-                        confusion_out_model_good[1,1]/sum(hotels_test$children==0)
-                      }else{
-                        confusion_out_model_good[1,2]/sum(hotels_test$children==0)
-                      })
+  confusion_out_model_small = as.matrix(confusionMatrix(data = as.factor(yhat_test_model_small),reference = as.factor(as.matrix(hotels_test$children))))
+  confusion_out_model_large = as.matrix(confusionMatrix(data = as.factor(yhat_test_model_large),reference = as.factor(as.matrix(hotels_test$children))))
+  confusion_out_model_good =  as.matrix(confusionMatrix(data = as.factor(yhat_test_model_good),reference = as.factor(as.matrix(hotels_test$children))))
+  out_model_small = data.frame(model = "Small Linear Model",
+                       TPR = confusion_out_model_small[2,2]/sum(hotels_test$children==1),
+                       FPR = confusion_out_model_small[2,1]/sum(hotels_test$children==0))
+  out_model_large = data.frame(model = "Large Linear Model",
+                               TPR = confusion_out_model_large[2,2]/sum(hotels_test$children==1),
+                               FPR = confusion_out_model_large[2,1]/sum(hotels_test$children==0))
+  out_model_good = data.frame(model = "Lasso Linear Model",
+                              TPR = confusion_out_model_good[2,2]/sum(hotels_test$children==1),
+                              FPR = confusion_out_model_good[2,1]/sum(hotels_test$children==0))
   rbind(out_model_small, out_model_large,out_model_good)
 } %>% as.data.frame()
+
+
+# roc_curve_hotel_test = foreach(thresh = thresh_grid, .combine='rbind') %do% {
+#   yhat_test_model_small = ifelse(phat_test_model_small >= thresh, 1, 0)
+#   yhat_test_model_large = ifelse(phat_test_model_large >= thresh, 1, 0)
+#   yhat_test_model_good = ifelse(phat_test_model_good >= thresh, 1, 0)
+#   confusion_out_model_small = table(y = hotels_test$children, yhat = yhat_test_model_small)
+#   confusion_out_model_large = table(y = hotels_test$children, yhat = yhat_test_model_large)
+#   confusion_out_model_good = table(y = hotels_test$children, yhat = yhat_test_model_good)
+#   out_model_small = data.frame(model = "model_small",
+#                                TPR = ifelse(sum(yhat_test_model_small) ==0, 0, confusion_out_model_small[2,2]/sum(hotels_test$children==1)),
+#                                FPR = ifelse(sum(yhat_test_model_small) == 0, 0,confusion_out_model_small[1,2]/sum(hotels_test$children==0)))
+#   out_model_large = data.frame(model = "model_large",
+#                                TPR = ifelse(sum(yhat_test_model_large) ==0, 0, confusion_out_model_large[2,2]/sum(hotels_test$children==1)),
+#                                FPR = ifelse(sum(yhat_test_model_large) == 0, 0,confusion_out_model_large[1,2]/sum(hotels_test$children==0)))
+#   out_model_good = data.frame(model = "model_good",
+#                               TPR = if(sum(yhat_test_model_good)==nrow(hotels_test)){
+#                                 confusion_out_model_good[2,1]/sum(hotels_test$children==1)
+#                               }else if(sum(yhat_test_model_good) == 0){
+#                                 0
+#                               }else{
+#                                 confusion_out_model_good[2,2]/sum(hotels_test$children==1)
+#                               },
+#                               FPR = if(sum(yhat_test_model_good)==nrow(hotels_test)){
+#                                 0
+#                               }else if(sum(yhat_test_model_good) == 0){
+#                                 confusion_out_model_good[1,1]/sum(hotels_test$children==0)
+#                               }else{
+#                                 confusion_out_model_good[1,2]/sum(hotels_test$children==0)
+#                               })
+#   rbind(out_model_small, out_model_large,out_model_good)
+# } %>% as.data.frame()
 
 
 
 ggplot(roc_curve_hotel) + 
   geom_line(aes(x=FPR, y=TPR, color=model)) + 
-  labs(title="ROC curves: linear vs. logit models") +
-  theme_bw(base_size = 10)
+  labs(title="ROC Curves") +
+  theme_minimal()
+
+hotels_val = hotels_val %>% mutate(fold_id = rep(1:K_folds, length=nrow(hotels_val)) %>% sample) %>% 
+  mutate_if(is.character,as.factor) %>% 
+  mutate(arrival_date = ymd(arrival_date))
+
+hotels_val = hotels_val %>%  
+  mutate_if(is.character,as.factor) %>% 
+  mutate(arrival_date = ymd(arrival_date))
+
+
 
 set.seed(1234)
   
 K_folds = 20
-
+hotels_val_x = model.matrix(children ~ (.-1 - arrival_date+month(arrival_date))^2, data=hotels_val)
 hotels_val = hotels_val %>%
   mutate(fold_id = rep(1:K_folds, length=nrow(hotels_val)) %>% sample)
 
+predict(hotel_lasso, newdata = hotels_val_x, type = 'response')
 
 pred = foreach(fold = 1:K_folds, .combine='cbind') %do% {
   # model_good_folds = lm(children ~(.-arrival_date + month(arrival_date))^2,
   #                 data=filter(hotels_val, fold_id != fold))
-  predict(model_good,newdata=filter(hotels_val, fold_id != fold))
+  # predict(hotel_lasso, newdata=as.matrix(filter(as.data.frame(hotels_val_x), fold_id != fold)),type = 'response')
+  predict(hotel_lasso, newdata=hotels_val_x,type = 'response')
 } %>% 
   colSums()
 
@@ -205,5 +237,3 @@ actual_number <- hotels_val %>%
 pred
 actual_number
 
-predict(model_good_folds)
-predict(model_small)
