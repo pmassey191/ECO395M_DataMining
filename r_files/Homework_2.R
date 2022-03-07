@@ -68,16 +68,29 @@ sum(german_credit$Default)
 
 
 #number 4
+Hmisc::describe(hotels_dev$reserved_room_type)
+hotels_dev = read.csv('data/hotels_dev.csv') %>% mutate(arrival_date = ymd(arrival_date)) %>% select(-reserved_room_type)
+hotels_val = read.csv('data/hotels_val.csv')%>% mutate(arrival_date = ymd(arrival_date)) %>%  select(-reserved_room_type)
 
-hotels_dev = read.csv('data/hotels_dev.csv')
-hotels_val = read.csv('data/hotels_val.csv')
+hotels_dev_dummies = fastDummies::dummy_cols(hotels_dev)%>% 
+  rename(customer_type_Transient_Party ="customer_type_Transient-Party")
+
+colnames(hotel_dev_dummies)
+
+hotels_val_dummies = fastDummies::dummy_cols(hotels_val) %>%
+  # mutate(reserved_room_type_L = 0,reserved_room_typeL = 0) %>% 
+  rename(customer_type_Transient_Party ="customer_type_Transient-Party")
+
+colnames(hotel_val_dummies)
 
 hotels_dev = hotels_dev %>% mutate_if(is.character,as.factor) %>% 
-  mutate(arrival_date = ymd(arrival_date))
+   mutate(arrival_date = ymd(arrival_date))
 
 hotels_split <- initial_split(hotels_dev,.8)
 hotels_train <- training(hotels_split)
 hotels_test <- testing(hotels_split)
+
+
 
 model_small <- lm(children ~ market_segment + adults + customer_type + 
                     is_repeated_guest, data = hotels_train)
@@ -90,6 +103,7 @@ model_large <- lm(children ~ . - arrival_date, data = hotels_train)
 hotel_x_train = model.matrix(children ~ (.-1 - arrival_date+month(arrival_date))^2, data=hotels_train) # do -1 to drop intercept!
 hotel_y_train = hotels_train$children
 
+
 # Note: there's also a "sparse.model.matrix"
 # here our matrix isn't sparse.
 # but sparse.model.matrix is a good way of doing things if you have factors.
@@ -101,8 +115,18 @@ plot(hotel_lasso) # the path plot!
 hotel_x_test = model.matrix(children ~ (.-1 - arrival_date+month(arrival_date))^2, data=hotels_test)
 hotel_y_test = hotels_test$children
 
+hotel_x_test = hotel_x_test %>% 
+  if("reserved_room_typeL" %in% names(as.data.frame(hotel_x_train))){
+    mutate(reserved_room_typeL = reserved_room_typeL)
+  }else{
+    mutate(reserved_room_typeL = 0)
+  }
+
+
 y_hat_lasso <- predict(hotel_lasso, newdata = hotel_x_test, type = 'response') %>% as.matrix() %>% as.data.frame()
 
+xx = as.data.frame(hotel_x_test)
+xy = as.data.frame(hotel_x_train)
 
 rmse <- sqrt(sum((y_hat_lasso - hotel_y_test)^2)/nrow(hotels_test))
 # AIC selected coef
@@ -139,26 +163,27 @@ rmse(model_small,hotels_test)
 rmse(model_large,hotels_test)
 
 
-phat_test_model_small = predict(model_small, hotels_test, type='response')
-phat_test_model_large = predict(model_large, hotels_test, type='response')
-phat_test_model_good = predict(hotel_lasso, newdata = hotel_x_test, type='response')
+
+phat_test_model_small = predict(model_small, hotels_val, type='response')
+phat_test_model_large = predict(model_large, hotels_val, type='response')
+phat_test_model_good = predict(hotel_lasso, newdata = hotels_val_x, type='response')
 thresh_grid = seq(1, 0, by=-0.005)
 roc_curve_hotel = foreach(thresh = thresh_grid, .combine='rbind') %do% {
   yhat_test_model_small = ifelse(phat_test_model_small >= thresh, 1, 0)
   yhat_test_model_large = ifelse(phat_test_model_large >= thresh, 1, 0)
   yhat_test_model_good = ifelse(phat_test_model_good >= thresh, 1, 0)
-  confusion_out_model_small = as.matrix(confusionMatrix(data = as.factor(yhat_test_model_small),reference = as.factor(as.matrix(hotels_test$children))))
-  confusion_out_model_large = as.matrix(confusionMatrix(data = as.factor(yhat_test_model_large),reference = as.factor(as.matrix(hotels_test$children))))
-  confusion_out_model_good =  as.matrix(confusionMatrix(data = as.factor(yhat_test_model_good),reference = as.factor(as.matrix(hotels_test$children))))
+  confusion_out_model_small = as.matrix(confusionMatrix(data = as.factor(yhat_test_model_small),reference = as.factor(as.matrix(hotels_val$children))))
+  confusion_out_model_large = as.matrix(confusionMatrix(data = as.factor(yhat_test_model_large),reference = as.factor(as.matrix(hotels_val$children))))
+  confusion_out_model_good =  as.matrix(confusionMatrix(data = as.factor(yhat_test_model_good),reference = as.factor(as.matrix(hotels_val$children))))
   out_model_small = data.frame(model = "Small Linear Model",
-                       TPR = confusion_out_model_small[2,2]/sum(hotels_test$children==1),
-                       FPR = confusion_out_model_small[2,1]/sum(hotels_test$children==0))
+                               TPR = confusion_out_model_small[2,2]/sum(hotels_val$children==1),
+                               FPR = confusion_out_model_small[2,1]/sum(hotels_val$children==0))
   out_model_large = data.frame(model = "Large Linear Model",
-                               TPR = confusion_out_model_large[2,2]/sum(hotels_test$children==1),
-                               FPR = confusion_out_model_large[2,1]/sum(hotels_test$children==0))
+                               TPR = confusion_out_model_large[2,2]/sum(hotels_val$children==1),
+                               FPR = confusion_out_model_large[2,1]/sum(hotels_val$children==0))
   out_model_good = data.frame(model = "Lasso Linear Model",
-                              TPR = confusion_out_model_good[2,2]/sum(hotels_test$children==1),
-                              FPR = confusion_out_model_good[2,1]/sum(hotels_test$children==0))
+                              TPR = confusion_out_model_good[2,2]/sum(hotels_val$children==1),
+                              FPR = confusion_out_model_good[2,1]/sum(hotels_val$children==0))
   rbind(out_model_small, out_model_large,out_model_good)
 } %>% as.data.frame()
 
@@ -201,32 +226,55 @@ ggplot(roc_curve_hotel) +
   labs(title="ROC Curves") +
   theme_minimal()
 
-hotels_val = hotels_val %>% mutate(fold_id = rep(1:K_folds, length=nrow(hotels_val)) %>% sample) %>% 
-  mutate_if(is.character,as.factor) %>% 
-  mutate(arrival_date = ymd(arrival_date))
 
-hotels_val = hotels_val %>%  
-  mutate_if(is.character,as.factor) %>% 
-  mutate(arrival_date = ymd(arrival_date))
+
+
 
 
 
 set.seed(1234)
   
 K_folds = 20
-hotels_val_x = model.matrix(children ~ (.-1 - arrival_date+month(arrival_date))^2, data=hotels_val)
-hotels_val = hotels_val %>%
+hotels_val <- hotels_val %>% 
   mutate(fold_id = rep(1:K_folds, length=nrow(hotels_val)) %>% sample)
+hotels_val_x = model.matrix(children ~ (.-1 - arrival_date+month(arrival_date))^2, data=hotels_val)
+hotels_val_x = hotels_val_x %>% as.data.frame() %>% 
+  mutate(fold_id = rep(1:K_folds, length=nrow(hotels_val)) %>% sample) %>% 
+  as.matrix()
 
-predict(hotel_lasso, newdata = hotels_val_x, type = 'response')
+hotels_val <- hotels_val %>% 
+  mutate(fold_id = rep(1:K_folds, length=nrow(hotels_val)) %>% sample,
+y_hat = predict(hotel_lasso, newdata = hotels_val_x,type = 'response'))
 
-pred = foreach(fold = 1:K_folds, .combine='cbind') %do% {
-  # model_good_folds = lm(children ~(.-arrival_date + month(arrival_date))^2,
-  #                 data=filter(hotels_val, fold_id != fold))
-  # predict(hotel_lasso, newdata=as.matrix(filter(as.data.frame(hotels_val_x), fold_id != fold)),type = 'response')
-  predict(hotel_lasso, newdata=hotels_val_x,type = 'response')
-} %>% 
-  colSums()
+
+
+compare <- hotels_val %>% 
+  group_by(fold_id) %>% 
+  summarise(
+    pred = sum(y_hat),
+    actual = sum(children)
+  )
+
+test <- as.data.frame(newx)
+
+
+
+
+
+pred = foreach(fold = 1:K_folds, .combine = 'cbind') %do% {
+  newx = filter(as.data.frame(hotels_val_x), fold_id == fold) %>% 
+    select(-fold_id) %>% 
+    as.matrix()
+  newy = filter(as.data.frame(hotels_val_x), fold_id == fold) %>% 
+    select(children) %>% 
+    as.matrix()
+  fold_model = gamlr(newx,newy, family = 'binomial')
+  predict(hotel_lasso, newdata = newx,type = 'response')
+}
+
+x = as.array(pred)
+
+colSums(x)
 
 actual_number <- hotels_val %>% 
   group_by(fold_id) %>% 
@@ -236,4 +284,5 @@ actual_number <- hotels_val %>%
 
 pred
 actual_number
-
+write.csv(xx,'C:/Users/Patrick/OneDrive/Desktop/test.csv')
+write.csv(test,'C:/Users/Patrick/OneDrive/Desktop/test2.csv')
