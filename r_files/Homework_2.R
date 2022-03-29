@@ -72,16 +72,16 @@ Hmisc::describe(hotels_dev$reserved_room_type)
 hotels_dev = read.csv('data/hotels_dev.csv') %>% mutate(arrival_date = ymd(arrival_date)) %>% select(-reserved_room_type)
 hotels_val = read.csv('data/hotels_val.csv')%>% mutate(arrival_date = ymd(arrival_date)) %>%  select(-reserved_room_type)
 
-hotels_dev_dummies = fastDummies::dummy_cols(hotels_dev)%>% 
-  rename(customer_type_Transient_Party ="customer_type_Transient-Party")
-
-colnames(hotel_dev_dummies)
-
-hotels_val_dummies = fastDummies::dummy_cols(hotels_val) %>%
-  # mutate(reserved_room_type_L = 0,reserved_room_typeL = 0) %>% 
-  rename(customer_type_Transient_Party ="customer_type_Transient-Party")
-
-colnames(hotel_val_dummies)
+# # hotels_dev_dummies = fastDummies::dummy_cols(hotels_dev)%>% 
+# #   rename(customer_type_Transient_Party ="customer_type_Transient-Party")
+# 
+# colnames(hotel_dev_dummies)
+# 
+# # hotels_val_dummies = fastDummies::dummy_cols(hotels_val) %>%
+# #   # mutate(reserved_room_type_L = 0,reserved_room_typeL = 0) %>% 
+# #   rename(customer_type_Transient_Party ="customer_type_Transient-Party")
+# 
+# colnames(hotel_val_dummies)
 
 hotels_dev = hotels_dev %>% mutate_if(is.character,as.factor) %>% 
    mutate(arrival_date = ymd(arrival_date))
@@ -115,18 +115,11 @@ plot(hotel_lasso) # the path plot!
 hotel_x_test = model.matrix(children ~ (.-1 - arrival_date+month(arrival_date))^2, data=hotels_test)
 hotel_y_test = hotels_test$children
 
-hotel_x_test = hotel_x_test %>% 
-  if("reserved_room_typeL" %in% names(as.data.frame(hotel_x_train))){
-    mutate(reserved_room_typeL = reserved_room_typeL)
-  }else{
-    mutate(reserved_room_typeL = 0)
-  }
+
 
 
 y_hat_lasso <- predict(hotel_lasso, newdata = hotel_x_test, type = 'response') %>% as.matrix() %>% as.data.frame()
 
-xx = as.data.frame(hotel_x_test)
-xy = as.data.frame(hotel_x_train)
 
 rmse <- sqrt(sum((y_hat_lasso - hotel_y_test)^2)/nrow(hotels_test))
 # AIC selected coef
@@ -255,10 +248,27 @@ compare <- hotels_val %>%
     actual = sum(children)
   )
 
+test = compare %>% pivot_longer(!fold_id, names_to = "category", values_to = "children")
+
 test <- as.data.frame(newx)
 
+ggplot(test, aes(x = fold_id, y = children, fill = category) )+
+  geom_bar(position = 'dodge', stat = 'identity')+
+  scale_x_discrete()
 
-
+ggplot(compare, aes(x = actual, y=pred))+
+  geom_point()+
+  geom_abline(slope = 1, intercept = 0)+
+  scale_x_continuous(limits = c(12,30))+
+  scale_y_continuous(limits = c(12,30))+
+  labs(title = "Predicted vs Observed Number of Children",
+       caption = "The line represents what a perfect fit would be between
+       predicted and observed number of children. We see an 
+       upward trend which indicates the model is performing adequetly.")+
+  xlab("Observed Number of Children")+
+  ylab("Predicted Number of Children")+
+  theme_minimal()
+  
 
 
 pred = foreach(fold = 1:K_folds, .combine = 'cbind') %do% {
