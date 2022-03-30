@@ -2,6 +2,7 @@ library(tidyverse)
 library(rpart)
 library(rpart.plot)
 library(rsample) 
+library(foreach)
 
 
 dengue = read.csv("Data/dengue.csv")
@@ -35,3 +36,20 @@ rpart.plot(this_model, digits=-5, type=4, extra=1)
 
 plot(1:maxM, sqrt(colMeans(err_save)))
 
+K_folds = 5
+
+# Pipeline 1:
+# create specific fold IDs for each row
+# the default behavior of sample actually gives a permutation
+test = dengue_train %>%
+  mutate(fold_id = rep(1:K_folds, length=nrow(dengue_train)) %>% sample)
+
+head(test)
+
+# now loop over folds
+rmse_cv = foreach(fold = 1:K_folds, .combine='c') %do% {
+  this_model =  rpart(total_cases~season + precipitation_amt + avg_temp_k + specific_humidity+dew_point_temp_k, 
+                      data=filter(test, fold_id != fold), control = rpart.control(cp = 0.002, minsplit=30))
+  modelr::rmse(this_model, data=filter(test, fold_id == fold))
+}
+rmse_cv
