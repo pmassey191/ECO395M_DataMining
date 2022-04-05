@@ -8,10 +8,14 @@ library(modelr)
 library(caret)
 library(gamlr)
 library(glmnet)
+library(gbm)
+
+
+
+
 
 greenbuildings <- read.csv("data/greenbuildings.csv") %>% 
   mutate(revenue = Rent*(leasing_rate/100),
-         green_certified = ifelse(LEED == 1 | Energystar == 1,1,0),
          utility_cost = net*Gas_Costs + net*Electricity_Costs) %>%
   select(-empl_gr)
 
@@ -19,29 +23,44 @@ greenbuildings_split <- initial_split(greenbuildings,.8)
 greenbuildings_test <- testing(greenbuildings_split)
 greenbuildings_train <- training(greenbuildings_split)
 
-lm_base = lm(revenue ~ size + age + renovated + class_a + class_b + green_rating + utility_cost + total_dd_07
-             + total_dd_07*utility_cost, data = greenbuildings_train)
+lm_base = lm(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energystar, data = greenbuildings_train)
 
 rmse(lm_base,greenbuildings_test)
 
-# 
-# gbx = model.matrix(revenue ~ (.-1)^2, data=greenbuildings_train) # do -1 to drop intercept!
-# gby = greenbuildings_train$revenue
-# nrow(gbx)
-# gblasso = gamlr(gbx, gby, family = "poisson")
-# plot(gblasso)
-# coef(gblasso)
-# 
-# test = glmnet(gbx,gby)
-# plot(test)
+prune_1se = function(my_tree) {
+  out = as.data.frame(my_tree$cptable)
+  thresh = min(out$xerror + out$xstd)
+  cp_opt = max(out$CP[out$xerror <= thresh])
+  prune(my_tree, cp=cp_opt)
+}
 
-gb_tree = rpart(revenue ~ size + age + renovated + class_a + class_b + green_rating + utility_cost,
-                  data=greenbuildings_train, control = rpart.control(cp = 0.001,minsplit = 100))
+gb_tree = rpart(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energystar,
+                  data=greenbuildings_train, control = rpart.control(cp = 0.001,minsplit = 30))
 rpart.plot(gb_tree, digits=-5, type=4, extra=1)
 
-gb_forest = randomForest(revenue ~ size + age + renovated + class_a + class_b + green_rating + utility_cost + total_dd_07,
-                           data=greenbuildings_train, importance = TRUE)
-plot(gb_forest)
+gb_tree_prune = prune_1se(gb_tree)
+rpart.plot(gb_tree_prune, digits=-5, type=4, extra=1)
 
+gb_forest = randomForest(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energystar,
+                           data=greenbuildings_train, importance = TRUE)
+
+boost1 = gbm(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energystar,
+             data=greenbuildings_train,
+             interaction.depth=7, n.trees=1000, shrinkage=.6)
+gbm.perf(boost1)
+
+plot(gb_forest)
+plot(gb_forest_1)
+
+modelr::rmse(gb_tree_prune, greenbuildings_test)
 modelr::rmse(gb_tree, greenbuildings_test)
 modelr::rmse(gb_forest, greenbuildings_test) 
+modelr::rmse(boost1, greenbuildings_test)
+
+varImpPlot(gb_forest_1)
+
+partialPlot(gb_forest_1, greenbuildings_test, 'green_rating', las=1)
+
+partialPlot(gb_forest_1, greenbuildings_test, 'green_rating', las=1)
+
+
