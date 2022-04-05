@@ -3,11 +3,8 @@ library(rpart)
 library(rpart.plot)
 library(rsample) 
 library(randomForest)
-library(lubridate)
 library(modelr)
 library(caret)
-library(gamlr)
-library(glmnet)
 library(gbm)
 
 
@@ -24,6 +21,7 @@ greenbuildings_test <- testing(greenbuildings_split)
 greenbuildings_train <- training(greenbuildings_split)
 
 lm_base = lm(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energystar, data = greenbuildings_train)
+plot(lm_base)
 
 rmse(lm_base,greenbuildings_test)
 
@@ -35,7 +33,7 @@ prune_1se = function(my_tree) {
 }
 
 gb_tree = rpart(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energystar,
-                  data=greenbuildings_train, control = rpart.control(cp = 0.001,minsplit = 30))
+                  data=greenbuildings_train, control = rpart.control(cp = 0.0001,minsplit = 30))
 rpart.plot(gb_tree, digits=-5, type=4, extra=1)
 
 gb_tree_prune = prune_1se(gb_tree)
@@ -50,17 +48,17 @@ boost1 = gbm(revenue ~ . - CS_PropertyID - cluster-leasing_rate-Rent-LEED-Energy
 gbm.perf(boost1)
 
 plot(gb_forest)
-plot(gb_forest_1)
+plot(gb_tree_prune)
 
 modelr::rmse(gb_tree_prune, greenbuildings_test)
 modelr::rmse(gb_tree, greenbuildings_test)
 modelr::rmse(gb_forest, greenbuildings_test) 
 modelr::rmse(boost1, greenbuildings_test)
 
-varImpPlot(gb_forest_1)
+varImpPlot(gb_forest, main = "Variable Importance Plot")
 
-partialPlot(gb_forest_1, greenbuildings_test, 'green_rating', las=1)
+partialPlot(gb_forest, greenbuildings_test, 'green_rating', las=1)
 
-partialPlot(gb_forest_1, greenbuildings_test, 'green_rating', las=1)
+partialPlot(gb_forest, greenbuildings_test, 'age', las=1)
 
 
