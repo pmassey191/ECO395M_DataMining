@@ -59,6 +59,8 @@ varImpPlot(gb_forest, main = "Variable Importance Plot")
 
 partialPlot(gb_forest, greenbuildings_test, 'green_rating', las=1)
 
-partialPlot(gb_forest, greenbuildings_test, 'age', las=1)
+partialPlot(gb_forest, greenbuildings_test, 'size', las=1)
 
-
+x = partialPlot(gb_forest, greenbuildings_test, 'green_rating', las=1) %>% as.data.frame()
+str(x)
+x[1,2]

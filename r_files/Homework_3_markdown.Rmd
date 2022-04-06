@@ -75,11 +75,17 @@ The random forest provides a significant reduction in RMSE as compared to our ba
 
 Now that we have developed a model for predicting the revenue generated from an building we will look at the importance of the variables we have used in our model.
 
-```{r}
+```{r, echo=FALSE,warning=FALSE }
 varImpPlot(gb_forest, main = "Variable Importance Plot")
 ```
 
+We can see that from a prediction point of view the green rating of a building does provide a large (>10%) increase in RMSE performance. Now lets look at the dollar increase in revenue from a building that has a green rating by creating a partial dependence plot shown below.
 
+```{r, echo=FALSE,warning=FALSE }
+partialPlot(gb_forest, greenbuildings_test, 'green_rating', las=1)
+x = partialPlot(gb_forest, greenbuildings_test, 'green_rating', las=1) %>% as.data.frame()
+```
 
+From the plot we can see that there is a small marginal improvement in the expected revenue for a green building versus a non-green building. In fact going from a non-green building to a green building will give a revenue increase of `r x[2,2] - x[1,2]` which in percentage terms leads to a `r round(100*((x[2,2] - x[1,2])/x[1,2]),3)`% increase in revenue. This is not a large increase in revenue for transitioning to a green certified building but it is large enough that it should be considered when making the decision. 
 
 
